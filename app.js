@@ -4,6 +4,7 @@
 "use strict";
 
 const FUNZIONE = "https://mghimjgrcfqcpsizfcui.supabase.co/functions/v1/giulia-shop";
+const AGENTE_MODELLO = "agent_4601m5w9jc2se249yxpmg96z9z1n"; // negozio di prova da cui si copiano gli assistenti
 const CHIAVE_SESSIONE = "giulia-shop-sessione";
 
 // La sessione resta nel browser; se la memoria del browser non è disponibile vale solo finché la pagina è aperta.
@@ -118,6 +119,9 @@ const ERRORI = {
   serve_https: "Il sito deve essere protetto (indirizzo che inizia con https://).",
   partner_non_trovato: "Agenzia non trovata.",
   creazione_non_riuscita: "Non è stato possibile creare il negozio. Riprova tra poco.",
+  conferma_non_valida: "Il nome scritto non corrisponde a quello del negozio.",
+  negozio_modello: "Questo è il negozio modello da cui nascono gli altri: non si può eliminare.",
+  eliminazione_non_riuscita: "Non è stato possibile eliminare il negozio. Riprova tra poco.",
   attivazione_non_riuscita: "L'assistente non si è attivato. Riprova tra poco.",
   assistente_non_configurabile: "L'attivazione automatica non è disponibile in questo momento.",
   credenziali_woocommerce_non_valide: "WooCommerce ha rifiutato le chiavi: ricontrolla Consumer key e Consumer secret.",
@@ -626,6 +630,16 @@ async function vistaNegozio() {
       <div id="link-creato"></div>
     </div>` : ""}
 
+    ${S.utente.admin && n.agente_id !== AGENTE_MODELLO ? `
+    <h2>Elimina il negozio</h2>
+    <div class="riquadro">
+      <p style="margin:0;font-size:14px">Cancella il negozio con richieste, conversazioni, clienti e accessi, e il suo assistente. Non si può annullare.</p>
+      <form id="form-elimina" style="display:grid;gap:10px" autocomplete="off">
+        <div class="campo"><label for="e-conferma">Per confermare scrivi il nome del negozio: ${esc(n.nome)}</label><input id="e-conferma" required autocapitalize="off" spellcheck="false"></div>
+        <div class="riga-btn"><button class="btn vuoto" type="submit">Elimina definitivamente</button></div>
+      </form>
+    </div>` : ""}
+
     <h2>Il tuo accesso</h2>
     <div class="riquadro">
       <p style="margin:0">Sei entrato come <b>${esc(S.utente.email)}</b>.</p>
@@ -884,6 +898,18 @@ collega.negozio = (el) => {
     try { await api("disattiva_accesso", { accesso_id: b.dataset.disattiva }); avviso("Accesso disattivato"); disegna(); }
     catch (err) { avviso(testoErrore(err)); }
   }));
+
+  $("#form-elimina", el)?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const b = $("button[type=submit]", e.currentTarget); b.disabled = true; b.textContent = "Eliminazione…";
+    try {
+      await api("elimina_negozio", { negozio_id: n.id, conferma: $("#e-conferma", el).value.trim() });
+      memoria.del("giulia-shop-negozio");
+      await ricaricaNegozi();
+      avviso(`${n.nome} eliminato`);
+      vai("oggi");
+    } catch (err) { avviso(testoErrore(err)); b.disabled = false; b.textContent = "Elimina definitivamente"; }
+  });
 
   $("#esci", el).addEventListener("click", async () => {
     await api("esci").catch(() => {});
