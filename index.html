@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Giulia Shop</title>
+  <meta name="description" content="Pannello del negozio: richieste dei clienti, conversazioni con Giulia e impostazioni.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0B0B" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230A0A0A'/%3E%3Crect x='10' y='10' width='12' height='12' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- Accesso -->
+  <main class="accesso" id="schermo-accesso" hidden>
+    <div class="scheda">
+      <div class="marchio"><i></i>Giulia <span>Shop</span></div>
+      <h1 id="accesso-titolo">Il pannello del tuo negozio</h1>
+      <p id="accesso-testo">Per entrare apri il link d'invito che hai ricevuto.</p>
+      <p class="nota" id="accesso-nota">Il link è personale e vale 7 giorni. Se è scaduto, chiedine uno nuovo a chi gestisce il tuo negozio.</p>
+    </div>
+  </main>
+
+  <!-- Applicazione -->
+  <div class="app" id="schermo-app" hidden>
+    <header class="testata">
+      <div class="marchio"><i></i>Giulia <span>Shop</span></div>
+      <div class="scegli-negozio" id="scegli-negozio" hidden>
+        <label class="sr" for="negozio">Negozio</label>
+        <select id="negozio"></select>
+      </div>
+      <button class="icona-btn" id="aggiorna" type="button" title="Aggiorna" aria-label="Aggiorna">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+      </button>
+    </header>
+
+    <nav class="nav" aria-label="Sezioni">
+      <button type="button" data-vista="oggi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        <span>Oggi</span>
+      </button>
+      <button type="button" data-vista="richieste">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v10H9l-5 4z"/></svg>
+        <span>Richieste</span><b class="bollino" id="bollino-richieste" hidden></b>
+      </button>
+      <button type="button" data-vista="conversazioni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h11v8H8l-4 3z"/><path d="M15 9h5v8l-3-2h-5v-1"/></svg>
+        <span>Chat</span>
+      </button>
+      <button type="button" data-vista="clienti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>
+        <span>Clienti</span>
+      </button>
+      <button type="button" data-vista="negozio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 2 3 3 0 0 1-5.4 0A3 3 0 0 1 4 11z"/><path d="M5.5 13.5V20h13v-6.5"/></svg>
+        <span>Negozio</span>
+      </button>
+    </nav>
+
+    <main class="contenuto" id="contenuto" tabindex="-1"></main>
+  </div>
+
+  <div id="strato-foglio"></div>
+  <div class="avviso" id="avviso" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
