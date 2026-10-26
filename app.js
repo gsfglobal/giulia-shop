@@ -144,15 +144,22 @@ async function copia(testo, input) {
 }
 
 /* ---------------- chiamate alla funzione ---------------- */
+// Richiesta "semplice" (testo, nessuna intestazione speciale): il browser non fa la richiesta preliminare CORS.
+// La sessione viaggia nel corpo; non essendo un cookie, un altro sito non può usarla.
 async function api(azione, dati = {}) {
-  const headers = { "content-type": "application/json" };
-  const sessione = memoria.get(CHIAVE_SESSIONE);
-  if (sessione) headers["x-sessione"] = sessione;
+  const corpo = JSON.stringify({ azione, sessione: memoria.get(CHIAVE_SESSIONE) || undefined, ...dati });
+  const invia = () => fetch(FUNZIONE, { method: "POST", headers: { "content-type": "text/plain;charset=UTF-8" }, body: corpo });
   let r;
   try {
-    r = await fetch(FUNZIONE, { method: "POST", headers, body: JSON.stringify({ azione, ...dati }) });
+    r = await invia();
   } catch {
-    throw new Error("rete");
+    // Un solo nuovo tentativo dopo un intoppo di rete.
+    await new Promise((ok) => setTimeout(ok, 700));
+    try { r = await invia(); } catch { throw new Error("rete"); }
+  }
+  if (r.status === 502 || r.status === 503 || r.status === 504) {
+    await new Promise((ok) => setTimeout(ok, 700));
+    try { r = await invia(); } catch { throw new Error("rete"); }
   }
   let j = {};
   try { j = await r.json(); } catch { /* risposta vuota */ }
