@@ -112,7 +112,20 @@ const ERRORI = {
   negozio_non_trovato: "Negozio non trovato o non accessibile.",
   credenziali_incomplete: "Mancano dei dati: controlla i campi.",
   credenziali_mancanti: "Il negozio non è ancora collegato.",
-  piattaforma_non_ancora_attiva: "Questa piattaforma sarà disponibile a breve.",
+  piattaforma_non_supportata: "Piattaforma non supportata.",
+  nome_mancante: "Scrivi il nome del negozio.",
+  indirizzo_non_valido: "L'indirizzo del sito non è valido. Esempio: www.negozio.it",
+  serve_https: "Il sito deve essere protetto (indirizzo che inizia con https://).",
+  partner_non_trovato: "Agenzia non trovata.",
+  creazione_non_riuscita: "Non è stato possibile creare il negozio. Riprova tra poco.",
+  attivazione_non_riuscita: "L'assistente non si è attivato. Riprova tra poco.",
+  assistente_non_configurabile: "L'attivazione automatica non è disponibile in questo momento.",
+  credenziali_woocommerce_non_valide: "WooCommerce ha rifiutato le chiavi: ricontrolla Consumer key e Consumer secret.",
+  woocommerce_non_trovato: "A questo indirizzo non risponde WooCommerce: controlla l'indirizzo del sito.",
+  woocommerce_risposta_non_valida: "Il sito ha risposto in modo inatteso: controlla l'indirizzo.",
+  credenziali_prestashop_non_valide: "PrestaShop ha rifiutato la chiave: ricontrollala e verifica che il Webservice sia attivo.",
+  prestashop_non_trovato: "A questo indirizzo non risponde il Webservice di PrestaShop: controlla l'indirizzo e che il Webservice sia attivo.",
+  prestashop_risposta_non_valida: "Il sito ha risposto in modo inatteso: controlla l'indirizzo.",
   email_non_valida: "L'email non è valida.",
   vietato: "Non hai i permessi per questa operazione.",
   non_puoi_disattivare_te_stesso: "Non puoi disattivare il tuo stesso accesso.",
@@ -121,8 +134,9 @@ const ERRORI = {
 };
 ERRORI.rete = "Connessione assente. Controlla la rete e riprova.";
 ERRORI.credenziali_shopify_non_valide = "Shopify ha rifiutato le chiavi: ricontrolla indirizzo, Client ID e Client secret.";
-ERRORI.permessi_insufficienti = "L'app Shopify non ha i permessi di lettura su prodotti, ordini e clienti.";
-const testoErrore = (e) => ERRORI[e?.message] ?? "Qualcosa non ha funzionato. Riprova tra poco.";
+ERRORI.permessi_insufficienti = "La chiave non ha i permessi di lettura su prodotti, ordini e clienti.";
+const testoErrore = (e) => ERRORI[e?.message] ?? (/^elevenlabs/.test(e?.message ?? "") ? ERRORI.attivazione_non_riuscita
+  : /^(piattaforma_http|shopify_token)/.test(e?.message ?? "") ? "Non riesco a collegarmi al negozio: controlla l'indirizzo." : "Qualcosa non ha funzionato. Riprova tra poco.");
 
 let avvisoTimer;
 function avviso(msg) {
@@ -216,6 +230,14 @@ function caricaNegozi() {
   sel.innerHTML = S.negozi.map((n) => `<option value="${n.id}">${esc(n.nome)}</option>`).join("");
   if (S.negozio) sel.value = S.negozio.id;
   $("#scegli-negozio").hidden = S.negozi.length < 2;
+  $("#nuovo-negozio").hidden = !S.utente.puo_creare;
+}
+
+// Dopo aver creato un negozio: ricarica l'elenco e lo seleziona.
+async function ricaricaNegozi(scegli) {
+  S.utente = await api("chi_sono");
+  if (scegli) memoria.set("giulia-shop-negozio", scegli);
+  caricaNegozi();
 }
 
 
@@ -233,7 +255,10 @@ function vai(vista) {
 async function disegna() {
   const c = $("#contenuto");
   if (!S.negozio) {
-    c.innerHTML = `<div class="vuoto-stato">Nessun negozio collegato al tuo accesso.</div>`;
+    c.innerHTML = S.utente?.puo_creare
+      ? `<div class="vuoto-stato">Ancora nessun negozio.<div class="riga-btn" style="justify-content:center;margin-top:12px"><button class="btn" type="button" id="primo-negozio">Aggiungi il primo negozio</button></div></div>`
+      : `<div class="vuoto-stato">Nessun negozio collegato al tuo accesso.</div>`;
+    $("#primo-negozio")?.addEventListener("click", apriNuovoNegozio);
     return;
   }
   const vista = S.vista;
@@ -305,7 +330,7 @@ async function vistaOggi() {
 
   return `
     <div class="titolo-vista"><div><h1>${esc(oggi[0].toUpperCase() + oggi.slice(1))}</h1>
-      <div class="sotto">${esc(n.nome)} · ${esc(n.nome_assistente || "Giulia")} è attiva</div></div></div>
+      <div class="sotto">${esc(n.nome)} · ${esc(n.nome_assistente || "Giulia")} ${n.agente_id ? "è attiva" : "non è ancora attiva"}</div></div></div>
     <div class="numeri">
       <div><b>${aperte.length}</b><span>Richieste da gestire</span></div>
       <div><b>${urgenti}</b><span>Urgenti</span></div>
@@ -524,10 +549,21 @@ async function vistaNegozio() {
   const info = n.info ?? {};
   const piattaforma = { shopify: "Shopify", woocommerce: "WooCommerce", prestashop: "PrestaShop" }[n.piattaforma] ?? n.piattaforma;
   const tipoCred = { storefront: "catalogo pubblico (Storefront)", admin: "app Shopify con chiavi", admin_token: "token Admin", woocommerce: "chiavi REST", prestashop: "chiave Webservice" };
+  const collegamento = `
+    <h2>Collegamento a ${esc(piattaforma)}</h2>
+    <div class="riquadro">
+      <p style="margin:0">${cred?.configurate ? `Collegato con ${esc(tipoCred[cred.tipo] ?? cred.tipo)}${cred.aggiornate_il ? `, aggiornato ${esc(quando(cred.aggiornate_il))}` : ""}.` : `Non ancora collegato: senza collegamento l'assistente non conosce prodotti e ordini.`}</p>
+      ${cred?.configurate ? `<div class="riga-btn"><button class="btn vuoto piccolo" type="button" id="prova-conn">Prova il collegamento</button></div>` : ""}
+      ${formCredenziali(n)}
+    </div>`;
 
   return `
     <div class="titolo-vista"><div><h1>${esc(n.nome)}</h1><div class="sotto">${esc(piattaforma)} · ${n.stato === "prova" ? "in prova" : esc(n.stato)}</div></div>
       ${n.url_negozio ? `<a class="btn vuoto piccolo" href="${esc(n.url_negozio)}" target="_blank" rel="noopener">Apri il sito</a>` : ""}</div>
+
+    ${sezioneInstallazione(n, g)}
+
+    ${g && !cred?.configurate ? collegamento : ""}
 
     <h2>Catalogo</h2>
     <div class="riquadro">
@@ -536,13 +572,19 @@ async function vistaNegozio() {
         <dt>Aggiornato</dt><dd>${n.catalogo_aggiornato_il ? esc(quando(n.catalogo_aggiornato_il)) : "mai"}</dd>
         ${n.catalogo_esito && n.catalogo_esito !== "ok" ? `<dt>Ultimo esito</dt><dd>${esc(n.catalogo_esito)}</dd>` : ""}
       </dl>
-      <p class="muto" style="margin:0;font-size:13px">Giulia legge prodotti, prezzi e disponibilità dal negozio. Si aggiorna da sola ogni 6 ore.</p>
+      <p class="muto" style="margin:0;font-size:13px">${esc(n.nome_assistente || "Giulia")} legge prodotti, prezzi e disponibilità dal negozio. Si aggiorna da solo ogni 6 ore.</p>
       <div class="riga-btn"><button class="btn vuoto piccolo" type="button" id="sincronizza">Aggiorna adesso</button></div>
     </div>
 
-    <h2>Cosa sa Giulia del negozio</h2>
+    <h2>Cosa sa ${esc(n.nome_assistente || "Giulia")} del negozio</h2>
     <form id="form-info" class="riquadro">
-      <div class="campo"><label for="i-nome">Nome dell'assistente</label><input id="i-nome" maxlength="40" value="${esc(n.nome_assistente ?? "Giulia")}"></div>
+      <div class="due-colonne">
+        <div class="campo"><label for="i-nome">Nome dell'assistente</label><input id="i-nome" maxlength="40" value="${esc(n.nome_assistente ?? "Giulia")}"></div>
+        <div class="campo"><label for="i-tono">Come parla ai clienti</label><select id="i-tono">
+          <option value="tu" ${n.tono !== "lei" ? "selected" : ""}>Dà del tu</option><option value="lei" ${n.tono === "lei" ? "selected" : ""}>Dà del lei</option></select></div>
+      </div>
+      <div class="campo"><label for="i-descrizione">Cosa vende il negozio</label><input id="i-descrizione" maxlength="200" value="${esc(n.descrizione ?? "")}" placeholder="Esempio: ceramiche e articoli da regalo fatti a mano">
+        <span class="aiuto">Una riga: aiuta l'assistente a presentarsi e a capire le domande.</span></div>
       ${ARGOMENTI_INFO.map(([k, label, aiuto]) => `<div class="campo"><label for="i-${k}">${label}</label>
         <textarea id="i-${k}" data-info="${k}" maxlength="3000" ${k === "tempi_risposta" ? 'style="min-height:56px"' : ""}>${esc(info[k] ?? "")}</textarea>
         <span class="aiuto">${aiuto}</span></div>`).join("")}
@@ -565,13 +607,9 @@ async function vistaNegozio() {
         <td class="num">${c.whatsapp}</td><td class="num">${c.sito}</td><td class="num">${Math.round((c.secondi_voce ?? 0) / 60)}</td></tr>`).join("")}</tbody>
     </table></div>` : `<div class="vuoto-stato">Ancora nessun consumo registrato.</div>`}
 
+    ${g && cred?.configurate ? collegamento : ""}
+
     ${g ? `
-    <h2>Collegamento a ${esc(piattaforma)}</h2>
-    <div class="riquadro">
-      <p style="margin:0">${cred?.configurate ? `Collegato con ${esc(tipoCred[cred.tipo] ?? cred.tipo)}${cred.aggiornate_il ? `, aggiornato ${esc(quando(cred.aggiornate_il))}` : ""}.` : "Non ancora collegato."}</p>
-      ${cred?.configurate ? `<div class="riga-btn"><button class="btn vuoto piccolo" type="button" id="prova-conn">Prova il collegamento</button></div>` : ""}
-      ${formCredenziali(n)}
-    </div>
 
     <h2>Accessi al pannello</h2>
     <div class="riquadro">
@@ -595,25 +633,179 @@ async function vistaNegozio() {
     </div>`;
 }
 
+const ISTRUZIONI_CHIAVI = {
+  shopify: "Nel pannello Shopify del negozio: Impostazioni → App → Sviluppa app → crea un'app con accesso in lettura a prodotti, ordini e clienti. Copia qui le chiavi.",
+  woocommerce: "Nel pannello WordPress: WooCommerce → Impostazioni → Avanzate → API REST → Aggiungi chiave, con permessi \"Lettura\". Copia qui le due chiavi.",
+  prestashop: "Nel pannello PrestaShop: Parametri avanzati → Webservice → attiva il Webservice e aggiungi una chiave con permesso di sola lettura (GET) su prodotti, combinazioni, giacenze, categorie, ordini, clienti, indirizzi e corrieri. Copia qui la chiave.",
+};
+
 function formCredenziali(n) {
-  if (n.piattaforma !== "shopify") {
-    return `<p class="muto" style="margin:0;font-size:13px">Il collegamento a ${esc(n.piattaforma)} sarà disponibile a breve.</p>`;
-  }
+  const sito = esc(n.url_negozio ?? "");
+  const campi = {
+    shopify: `
+        <div class="campo"><label for="k-dominio">Indirizzo del negozio Shopify</label><input id="k-dominio" required placeholder="nomenegozio.myshopify.com" spellcheck="false" autocapitalize="off"></div>
+        <div class="campo"><label for="k-id">Client ID</label><input id="k-id" required spellcheck="false" autocapitalize="off" class="mono"></div>
+        <div class="campo"><label for="k-secret">Client secret</label><input id="k-secret" type="password" required spellcheck="false" class="mono"></div>`,
+    woocommerce: `
+        <div class="campo"><label for="k-url">Indirizzo del sito</label><input id="k-url" required value="${sito}" placeholder="https://www.negozio.it" spellcheck="false" autocapitalize="off"></div>
+        <div class="campo"><label for="k-ck">Consumer key</label><input id="k-ck" required placeholder="ck_…" spellcheck="false" autocapitalize="off" class="mono"></div>
+        <div class="campo"><label for="k-cs">Consumer secret</label><input id="k-cs" type="password" required placeholder="cs_…" spellcheck="false" class="mono"></div>`,
+    prestashop: `
+        <div class="campo"><label for="k-url">Indirizzo del sito</label><input id="k-url" required value="${sito}" placeholder="https://www.negozio.it" spellcheck="false" autocapitalize="off"></div>
+        <div class="campo"><label for="k-chiave">Chiave del Webservice</label><input id="k-chiave" type="password" required spellcheck="false" class="mono"></div>`,
+  }[n.piattaforma];
+  if (!campi) return `<p class="muto" style="margin:0;font-size:13px">Piattaforma non supportata.</p>`;
   return `
     <details>
       <summary class="btn vuoto piccolo" style="list-style:none;width:max-content">Collega o aggiorna le chiavi</summary>
       <form id="form-cred" style="display:grid;gap:10px;margin-top:12px" autocomplete="off">
-        <p class="muto" style="margin:0;font-size:13px">Nel pannello Shopify del negozio: Impostazioni → App → Sviluppa app → crea un'app con accesso in lettura a prodotti, ordini e clienti. Copia qui le chiavi: restano cifrate e non vengono mai mostrate.</p>
-        <div class="campo"><label for="k-dominio">Indirizzo del negozio Shopify</label><input id="k-dominio" required placeholder="nomenegozio.myshopify.com" spellcheck="false"></div>
-        <div class="campo"><label for="k-id">Client ID</label><input id="k-id" required spellcheck="false" class="mono"></div>
-        <div class="campo"><label for="k-secret">Client secret</label><input id="k-secret" type="password" required spellcheck="false" class="mono"></div>
+        <p class="muto" style="margin:0;font-size:13px">${esc(ISTRUZIONI_CHIAVI[n.piattaforma])} Restano cifrate e non vengono mai mostrate.</p>
+        ${campi}
         <div class="riga-btn"><button class="btn" type="submit">Verifica e salva</button></div>
       </form>
     </details>`;
 }
 
+function datiCredenziali(n) {
+  const v = (id) => $(id)?.value.trim() ?? "";
+  if (n.piattaforma === "woocommerce") return { tipo: "woocommerce", url: v("#k-url"), consumer_key: v("#k-ck"), consumer_secret: v("#k-cs") };
+  if (n.piattaforma === "prestashop") return { tipo: "prestashop", url: v("#k-url"), chiave: v("#k-chiave") };
+  return { tipo: "admin", dominio: v("#k-dominio"), client_id: v("#k-id"), client_secret: v("#k-secret") };
+}
+
+/* ---------------- installazione sul sito ---------------- */
+const NOMI_PIATTAFORMA = { shopify: "Shopify", woocommerce: "WooCommerce", prestashop: "PrestaShop" };
+const DOVE_INCOLLARE = {
+  shopify: "Shopify: Negozio online → Temi → ⋯ → Modifica codice → file theme.liquid. Incolla il codice subito prima di </body> e salva.",
+  woocommerce: "WordPress: con un plugin per inserire codice (per esempio WPCode) aggiungi il codice nel piè di pagina di tutte le pagine. In alternativa nel file footer.php del tema, prima di </body>.",
+  prestashop: "PrestaShop: con un modulo per il codice personalizzato aggiungi il codice nel piè di pagina. In alternativa nel file del tema templates/_partials/footer.tpl, prima della fine.",
+};
+
+const dominio = (u) => { try { return new URL(u).hostname; } catch { return ""; } };
+const indirizzo = (percorso) => new URL(percorso, location.origin + location.pathname).href;
+
+function codiceInstallazione(n) {
+  const a = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return `<script src="${indirizzo("widget/giulia.js")}" data-agente="${a(n.agente_id)}" data-negozio="${a(n.nome)}" data-nome="${a(n.nome_assistente || "Giulia")}" defer></script>`;
+}
+
+function linkProva(n) {
+  const q = new URLSearchParams({ a: n.agente_id, n: n.nome, g: n.nome_assistente || "Giulia" });
+  return indirizzo("prova/") + "?" + q.toString();
+}
+
+function sezioneInstallazione(n, g) {
+  const nome = esc(n.nome_assistente || "Giulia");
+  if (!n.agente_id) {
+    return `<h2>${nome} sul sito</h2>
+      <div class="riquadro">
+        <p style="margin:0">${nome} non è ancora attiva per questo negozio.</p>
+        ${g ? `<div class="riga-btn"><button class="btn" type="button" id="attiva-assistente">Attiva ${nome}</button></div>` : `<p class="muto" style="margin:0;font-size:13px">Chiedi a chi gestisce il negozio di attivarla.</p>`}
+      </div>`;
+  }
+  return `<h2>${nome} sul sito</h2>
+    <div class="riquadro">
+      <p style="margin:0">Per mettere ${nome} sul sito basta incollare questo codice in tutte le pagine.</p>
+      <pre class="codice" id="codice-sito">${esc(codiceInstallazione(n))}</pre>
+      <div class="riga-btn">
+        <button class="btn piccolo" type="button" id="copia-codice">${ICONE.copia}Copia il codice</button>
+        <a class="btn vuoto piccolo" href="${esc(linkProva(n))}" target="_blank" rel="noopener">Prova ${nome}</a>
+      </div>
+      <details class="piattaforma"><summary>Dove incollarlo</summary>
+        <p class="muto" style="margin:8px 0 0;font-size:13.5px">${esc(DOVE_INCOLLARE[n.piattaforma] ?? "Nel piè di pagina del sito, prima di </body>.")}</p>
+        <p class="muto" style="margin:6px 0 0;font-size:13.5px">La chat funziona solo sul sito del negozio${dominio(n.url_negozio) ? ` (${esc(dominio(n.url_negozio))})` : ""} e nella pagina di prova.</p>
+      </details>
+    </div>`;
+}
+
+/* ---------------- nuovo negozio ---------------- */
+function apriNuovoNegozio() {
+  const partner = S.utente?.partner ?? [];
+  const sceltaPartner = S.utente?.admin && partner.length
+    ? `<div class="campo"><label for="nn-partner">Agenzia che segue il negozio</label><select id="nn-partner">
+        ${partner.map((p, i) => `<option value="${esc(p.id)}" ${i === 0 ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}
+        <option value="">Nessuna agenzia</option></select></div>`
+    : "";
+  apriFoglio(`
+    <h3>Nuovo negozio</h3>
+    <p class="muto" id="intro-nuovo" style="margin:0 0 14px;font-size:14px">L'assistente del negozio si crea da solo in pochi secondi. Il catalogo si collega dopo, dalle impostazioni del negozio.</p>
+    <form id="form-nuovo" style="display:grid;gap:12px" autocomplete="off">
+      <div class="campo"><label for="nn-nome">Nome del negozio</label><input id="nn-nome" required maxlength="60" placeholder="Esempio: Bottega Rossi"></div>
+      <div class="campo"><label for="nn-sito">Indirizzo del sito</label><input id="nn-sito" required maxlength="200" placeholder="www.negozio.it" spellcheck="false" autocapitalize="off" inputmode="url"></div>
+      <div class="due-colonne">
+        <div class="campo"><label for="nn-piattaforma">Piattaforma</label><select id="nn-piattaforma">
+          <option value="shopify">Shopify</option><option value="woocommerce">WooCommerce</option><option value="prestashop">PrestaShop</option></select></div>
+        <div class="campo"><label for="nn-tono">Come parla ai clienti</label><select id="nn-tono">
+          <option value="tu">Dà del tu</option><option value="lei">Dà del lei</option></select></div>
+      </div>
+      <div class="campo"><label for="nn-descrizione">Cosa vende (facoltativo)</label><input id="nn-descrizione" maxlength="200" placeholder="Esempio: scarpe e abbigliamento sportivo"></div>
+      <div class="campo"><label for="nn-assistente">Nome dell'assistente</label><input id="nn-assistente" maxlength="40" value="Giulia"></div>
+      ${sceltaPartner}
+      <div class="campo"><label for="nn-email">Email del negoziante (facoltativa)</label><input id="nn-email" type="email" maxlength="160" placeholder="nome@negozio.it">
+        <span class="aiuto">Se la scrivi, ricevi il link d'invito al pannello da mandargli.</span></div>
+      <div class="riga-btn"><button class="btn" type="submit">Crea il negozio</button></div>
+    </form>
+    <div id="esito-nuovo"></div>`, (f) => {
+    $("#nn-nome", f).focus();
+    $("#form-nuovo", f).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const b = $("button[type=submit]", e.currentTarget);
+      b.disabled = true; b.textContent = "Creazione in corso…";
+      const v = (id) => $(id, f)?.value.trim() ?? "";
+      const dati = {
+        nome: v("#nn-nome"), sito: v("#nn-sito"), piattaforma: v("#nn-piattaforma"), tono: v("#nn-tono"),
+        descrizione: v("#nn-descrizione"), nome_assistente: v("#nn-assistente") || "Giulia", email: v("#nn-email"),
+      };
+      if ($("#nn-partner", f)) dati.partner_id = v("#nn-partner");
+      try {
+        const r = await api("crea_negozio", dati);
+        await ricaricaNegozi(r.negozio_id);
+        mostraNegozioCreato(f, r, dati);
+      } catch (err) {
+        avviso(testoErrore(err));
+        b.disabled = false; b.textContent = "Crea il negozio";
+      }
+    });
+  });
+}
+
+function mostraNegozioCreato(f, r, dati) {
+  const n = S.negozi.find((x) => x.id === r.negozio_id) ?? { nome: dati.nome, nome_assistente: dati.nome_assistente, agente_id: r.agente_id, piattaforma: dati.piattaforma };
+  const nome = esc(n.nome_assistente || "Giulia");
+  const invito = r.invito ? indirizzo("") + "#invito=" + r.invito : "";
+  $("#form-nuovo", f).remove();
+  $("#intro-nuovo", f)?.remove();
+  f.scrollTop = 0;
+  $("#esito-nuovo", f).innerHTML = `<div class="esito">
+    ${n.agente_id ? `<div class="spunta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <p style="margin:0;font-size:16px"><b>${esc(n.nome)}</b> è pronto e ${nome} è attiva.</p>`
+      : `<p style="margin:0;font-size:16px"><b>${esc(n.nome)}</b> è stato creato, ma ${nome} non si è attivata. La puoi attivare dalla scheda del negozio.</p>`}
+    <ol class="passi">
+      ${n.agente_id ? `<li><b>Provala</b> come farebbe un cliente.</li>` : ""}
+      <li><b>Collega il catalogo</b> di ${esc(NOMI_PIATTAFORMA[n.piattaforma] ?? n.piattaforma)} dalla scheda del negozio.</li>
+      <li><b>Scrivi le informazioni</b> su spedizioni, resi e pagamenti.</li>
+      ${n.agente_id ? `<li><b>Metti il codice sul sito</b>: lo trovi nella scheda del negozio.</li>` : ""}
+    </ol>
+    ${invito ? `<div class="riquadro"><b>Link d'invito per ${esc(r.email)}</b>
+      <div class="link-copia"><input readonly value="${esc(invito)}" aria-label="Link d'invito"><button class="btn piccolo" type="button" id="copia-invito">Copia</button></div>
+      <span class="aiuto muto" style="font-size:12.5px">Mandalo tu via WhatsApp o email. Vale 7 giorni.</span></div>` : ""}
+    <div class="riga-btn">
+      ${n.agente_id ? `<a class="btn" href="${esc(linkProva(n))}" target="_blank" rel="noopener">Prova ${nome}</a>` : ""}
+      <button class="btn ${n.agente_id ? "vuoto" : ""}" type="button" id="vai-negozio">Apri la scheda del negozio</button>
+    </div></div>`;
+  $("#copia-invito", f)?.addEventListener("click", () => copia(invito, $("#esito-nuovo input", f)));
+  $("#vai-negozio", f).addEventListener("click", () => { chiudiFoglio(); vai("negozio"); });
+  disegna();
+}
+
 collega.negozio = (el) => {
   const n = S.negozio;
+  $("#copia-codice", el)?.addEventListener("click", () => copia(codiceInstallazione(n)));
+  $("#attiva-assistente", el)?.addEventListener("click", async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = "Attivazione in corso…";
+    try { await api("attiva_assistente", { negozio_id: n.id }); avviso(`${n.nome_assistente || "Giulia"} è attiva`); disegna(); }
+    catch (err) { avviso(testoErrore(err)); b.disabled = false; b.textContent = `Attiva ${n.nome_assistente || "Giulia"}`; }
+  });
   // I testi per Giulia crescono con il contenuto, senza scorrere dentro il riquadro.
   const cresci = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; };
   $$("[data-info]", el).forEach((t) => { cresci(t); t.addEventListener("input", () => cresci(t)); });
@@ -631,10 +823,14 @@ collega.negozio = (el) => {
       if (v) info[t.dataset.info] = v; else delete info[t.dataset.info];
     });
     const nome = $("#i-nome", el).value.trim() || "Giulia";
+    const tono = $("#i-tono", el).value, descrizione = $("#i-descrizione", el).value.trim();
+    const cambiaAssistente = nome !== (n.nome_assistente || "Giulia") || tono !== (n.tono || "tu") || descrizione !== (n.descrizione ?? "");
     try {
-      await api("salva_info", { negozio_id: n.id, info, nome_assistente: nome });
-      n.info = info; n.nome_assistente = nome;
-      avviso("Informazioni salvate: Giulia le usa da subito");
+      const r = await api("salva_info", { negozio_id: n.id, info, nome_assistente: nome, tono, descrizione });
+      Object.assign(n, { info, nome_assistente: nome, tono, descrizione });
+      avviso(r.avviso === "assistente_non_aggiornato" ? "Salvato, ma l'assistente non si è aggiornato: riprova tra poco"
+        : `Informazioni salvate: ${nome} le usa da subito`);
+      if (cambiaAssistente) disegna();
     } catch (err) { avviso(testoErrore(err)); }
   });
 
@@ -649,11 +845,13 @@ collega.negozio = (el) => {
     e.preventDefault();
     const b = $("button[type=submit]", e.currentTarget); b.disabled = true; b.textContent = "Verifica in corso…";
     try {
-      const r = await api("salva_credenziali", { negozio_id: n.id, dati: { tipo: "admin", dominio: $("#k-dominio").value, client_id: $("#k-id").value, client_secret: $("#k-secret").value } });
-      avviso(`Collegato${r.negozio ? " a " + r.negozio : ""}`);
+      const r = await api("salva_credenziali", { negozio_id: n.id, dati: datiCredenziali(n) });
+      avviso(`Collegato${r.negozio ? " a " + r.negozio : ""}${r.ordini === false ? " (solo catalogo: mancano i permessi sugli ordini)" : ""}`);
+      // Primo collegamento: carica subito il catalogo.
+      api("sincronizza", { negozio_id: n.id }).then((s) => { avviso(`Catalogo caricato: ${s.prodotti ?? 0} prodotti`); if (S.vista === "negozio") disegna(); }).catch(() => {});
       disegna();
     } catch (err) {
-      avviso(ERRORI[err.message] ? testoErrore(err) : /^(shopify|piattaforma)/.test(err.message) ? "Non riesco a collegarmi al negozio: controlla l'indirizzo." : testoErrore(err));
+      avviso(ERRORI[err.message] ? testoErrore(err) : "Non riesco a collegarmi al sito del negozio: controlla l'indirizzo.");
       b.disabled = false; b.textContent = "Verifica e salva";
     }
   });
@@ -720,6 +918,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#fogl
 /* ---------------- eventi globali ---------------- */
 $$(".nav button").forEach((b) => b.addEventListener("click", () => vai(b.dataset.vista)));
 $("#aggiorna").addEventListener("click", () => disegna());
+$("#nuovo-negozio").addEventListener("click", apriNuovoNegozio);
 $("#negozio").addEventListener("change", (e) => {
   S.negozio = S.negozi.find((n) => n.id === e.target.value) ?? S.negozio;
   memoria.set("giulia-shop-negozio", S.negozio.id);

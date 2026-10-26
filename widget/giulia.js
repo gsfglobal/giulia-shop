@@ -1,7 +1,8 @@
 /* Giulia Shop – chat e voce per i negozi online.
    Installazione: <script src=".../widget/giulia.js" data-agente="agent_…" data-negozio="Nome" defer></script>
    Opzioni (attributi dello script): data-nome (nome dell'assistente), data-colore (colore principale),
-   data-idee (domande di esempio separate da |), data-voce="no" (solo chat), data-posizione="sinistra". */
+   data-idee (domande di esempio separate da |), data-voce="no" (solo chat), data-posizione="sinistra",
+   data-aperto="si" (chat già aperta al caricamento, per le pagine di prova). */
 (function () {
   "use strict";
   if (window.__giuliaShop) return;
@@ -19,7 +20,8 @@
     colore: script.getAttribute("data-colore") || "#111111",
     voce: script.getAttribute("data-voce") !== "no",
     sinistra: script.getAttribute("data-posizione") === "sinistra",
-    idee: (script.getAttribute("data-idee") || "Cerco scarpe da corsa sotto i 100 dollari|Dov'è il mio ordine?|Come funzionano i resi?").split("|").filter(Boolean).slice(0, 4),
+    idee: (script.getAttribute("data-idee") || "Mi consigli un prodotto?|Dov'è il mio ordine?|Come funzionano i resi?").split("|").filter(Boolean).slice(0, 4),
+    aperto: script.getAttribute("data-aperto") === "si",
   };
   if (!/^agent_[A-Za-z0-9]+$/.test(cfg.agente)) return;
   if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cfg.colore)) cfg.colore = "#111111";
@@ -288,4 +290,5 @@
   $(".piede").addEventListener("submit", function (e) { e.preventDefault(); manda(area.value); });
   root.addEventListener("keydown", function (e) { if (e.key === "Escape" && w.classList.contains("aperto")) $(".chiudi").click(); });
   window.addEventListener("pagehide", function () { chiudiChat(); if (voce) fineVoce(); });
+  if (cfg.aperto) $(".lancia").click();
 })();

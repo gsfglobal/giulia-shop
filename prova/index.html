@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Prova l'assistente</title>
+  <meta name="description" content="Pagina per provare l'assistente virtuale del negozio prima di metterlo sul sito.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230A0A0A'/%3E%3Crect x='10' y='10' width='12' height='12' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;600;700&display=swap">
+  <style>
+    :root {
+      --carta: #FFFFFF; --inchiostro: #0A0A0A; --muto: #6B6B6B; --linea: #E2E2E2; --superficie: #F3F3F3;
+      --f-ui: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif; --f-dati: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --carta: #0B0B0B; --inchiostro: #F4F4F4; --muto: #9C9C9C; --linea: #2A2A2A; --superficie: #171717; color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --carta: #0B0B0B; --inchiostro: #F4F4F4; --muto: #9C9C9C; --linea: #2A2A2A; --superficie: #171717; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--carta); color: var(--inchiostro); }
+    body { font: 16px/1.55 var(--f-ui); -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+    main {
+      max-width: 620px; margin: 0 auto; display: grid; gap: 22px;
+      padding-block: max(40px, env(safe-area-inset-top)) 140px;
+      padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
+    }
+    .marchio { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+    .marchio i { width: 13px; height: 13px; background: var(--inchiostro); display: inline-block; }
+    .marchio span { font-weight: 400; }
+    .etichetta { font: 500 11.5px var(--f-dati); text-transform: uppercase; letter-spacing: .08em; color: var(--muto); margin: 0; }
+    h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.08; letter-spacing: -.025em; margin: 6px 0 0; text-wrap: balance; }
+    p { margin: 0; }
+    .testo { color: var(--muto); max-width: 52ch; }
+    ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; background: var(--linea); border: 1px solid var(--linea); border-radius: 10px; overflow: hidden; }
+    ol li { background: var(--carta); padding: 14px 16px; display: grid; grid-template-columns: 28px 1fr; gap: 10px; }
+    ol li b { font: 600 13px/1.6 var(--f-dati); }
+    ol li span { min-width: 0; }
+    .nota { font-size: 13.5px; color: var(--muto); border-top: 1px solid var(--linea); padding-top: 16px; }
+    @media (min-width: 960px) { main { margin: 0 0 0 max(6vw, 32px); max-width: 540px; } }
+    .errore { border: 1px dashed var(--linea); border-radius: 10px; padding: 20px 16px; color: var(--muto); }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="marchio"><i></i>Giulia <span>Shop</span></div>
+    <div>
+      <p class="etichetta">Pagina di prova</p>
+      <h1 id="titolo">Prova l'assistente del negozio</h1>
+    </div>
+    <p class="testo" id="testo">Scrivi come farebbe un cliente. La chat è in basso a destra; dal telefono si apre a tutto schermo.</p>
+    <ol id="idee">
+      <li><b>01</b><span>Chiedi un consiglio su un prodotto, con un budget.</span></li>
+      <li><b>02</b><span>Chiedi come funzionano spedizioni e resi.</span></li>
+      <li><b>03</b><span>Chiedi di parlare con una persona: la richiesta arriva nel pannello.</span></li>
+      <li><b>04</b><span>Prova a voce con il pulsante del telefono (serve il permesso del microfono).</span></li>
+    </ol>
+    <p class="nota">Le conversazioni di prova compaiono nel pannello, nella sezione Chat, dopo qualche minuto. Questa pagina non è visibile ai clienti del negozio.</p>
+  </main>
+  <script>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var agente = q.get("a") || "";
+      var negozio = (q.get("n") || "").slice(0, 60);
+      var nome = (q.get("g") || "Giulia").slice(0, 40);
+      if (!/^agent_[A-Za-z0-9]+$/.test(agente)) {
+        document.getElementById("titolo").textContent = "Link di prova non valido";
+        document.getElementById("testo").textContent = "Apri la prova dal pannello del negozio, con il pulsante \"Prova\".";
+        document.getElementById("idee").remove();
+        return;
+      }
+      document.title = "Prova " + nome + (negozio ? " · " + negozio : "");
+      document.getElementById("titolo").textContent = "Prova " + nome + (negozio ? ", l'assistente di " + negozio : "");
+      var s = document.createElement("script");
+      s.src = "../widget/giulia.js";
+      s.setAttribute("data-agente", agente);
+      s.setAttribute("data-negozio", negozio);
+      s.setAttribute("data-nome", nome);
+      s.setAttribute("data-aperto", "si");
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>
